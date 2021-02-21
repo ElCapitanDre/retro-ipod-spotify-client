@@ -1,4 +1,5 @@
 import spotify_manager
+import settings_manager
 from functools import lru_cache 
 
 MENU_PAGE_SIZE = 6
@@ -13,7 +14,8 @@ LINE_NORMAL = 0
 LINE_HIGHLIGHT = 1
 LINE_TITLE = 2
 
-spotify_manager.refresh_devices()
+#spotify_manager.refresh_devices()
+spotify_manager.refresh_data()
 
 class LineItem():
     def __init__(self, title = "", line_type = LINE_NORMAL, show_arrow = False):
@@ -296,6 +298,63 @@ class ShowsPage(MenuPage):
     def page_at(self, index):
         return SingleShowPage(self.shows[index], self)
 
+class SettingsPage(MenuPage): 
+    def __init__(self, previous_page):
+        super().__init__(self.get_title(), previous_page, has_sub_page=True)
+        self.settings_entries = self.get_entries()
+        self.num_entries = len(self.settings_entries)
+
+    def get_title(self):
+        return "Settings"
+
+    def get_entries(self):
+        return settings_manager.get_settings_entries()
+
+    def total_size(self):
+        return self.num_entries
+
+    def page_at(self, index):
+        return SubMenuPage(self, self.settings_entries[index].id)
+
+class SubMenuPage(MenuPage):
+    def __init__(self, previous_page, setting_id):
+        self.setting_id = setting_id
+        super().__init__(self.get_title(), previous_page, has_sub_page=True)
+        self.sub_entries = self.get_sub_entries()
+        self.num_sub_entries = len(self.sub_entries)
+
+    def get_title(self):
+        return settings_manager.get_sub_settings_title(self.setting_id)
+
+    def get_sub_entries(self):
+        return settings_manager.get_sub_settings_entries(self.setting_id)
+
+    def total_size(self):
+        return self.num_sub_entries
+
+    def page_at(self, index):
+        if(self.sub_entries[index].id == "0_0"):
+            return ScanWifiPage(self)
+        else:
+            return PlaceHolderPage(self.sub_entries[index].name, self, has_sub_page=False, is_title=True)
+
+class ScanWifiPage(MenuPage):
+    def __init__(self, previous_page):
+        super().__init__(self.get_title(), previous_page, has_sub_page=True)
+        self.wifi_networks = self.get_networks()
+        self.num_wifi_networks = len(self.wifi_networks)
+
+    def get_title(self):
+        return "Scan Wifi Networks"
+
+    def get_networks(self):
+        return settings_manager.get_wlan_networks()
+
+    def total_size(self):
+        return self.num_wifi_networks
+
+    def page_at(self, index):
+        return PlaceHolderPage(self.wifi_networks[index].ssid, self, has_sub_page=False, is_title=True)
 class PlaylistsPage(MenuPage):
     def __init__(self, previous_page):
         super().__init__(self.get_title(), previous_page, has_sub_page=True)
@@ -494,6 +553,7 @@ class RootPage(MenuPage):
             PlaylistsPage(self),
             ShowsPage(self),
             SearchPage(self),
+            SettingsPage(self),
             NowPlayingPage(self, "Now Playing", NowPlayingCommand())
         ]
         self.index = 0
